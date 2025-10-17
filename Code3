@@ -1,0 +1,112 @@
+import numpy as np
+from scipy import stats
+import matplotlib.pyplot as plt
+
+def load_data(filename="data.txt"):
+    try:
+        with open(filename, 'r') as f:
+            data = [float(x) for x in f.read().split()]
+        return data
+    except FileNotFoundError:
+        print(f"Файл {filename} не найден.")
+        return None
+
+def get_intervals(data, num_bins=10):
+    """Возвращает границы интервалов."""
+    min_val = min(data)
+    max_val = max(data)
+    step = (max_val - min_val) / num_bins
+    intervals = []
+    for i in range(num_bins):
+        left = min_val + i * step
+        right = min_val + (i + 1) * step
+        if i == num_bins - 1:
+            right = max_val  # последний интервал до max
+        intervals.append((left, right))
+    return intervals
+
+def compute_theoretical_probabilities(data, intervals):
+    """Вычисляет теоретические вероятности попадания в интервалы под нормальным распределением."""
+    mean = np.mean(data)
+    std = np.std(data, ddof=1)  # исправленное стандартное отклонение
+
+    probabilities = []
+    for left, right in intervals:
+        p_left = stats.norm.cdf(left, mean, std)
+        p_right = stats.norm.cdf(right, mean, std)
+        prob = p_right - p_left
+        probabilities.append(prob)
+
+    return probabilities
+
+def save_to_table(intervals, probabilities, filename="table.txt"):
+    """Сохраняет результаты в таблицу (в файл и выводит в консоль)."""
+    print("\nТаблица : Теоретические частоты попадания случайной величины в интервалы\n")
+    print(f"{'Границы интервалов':<20} {'Теоретические вероятности':<25}")
+    print("-" * 45)
+    
+    with open(filename, 'w', encoding='utf-8') as f:
+        f.write("Таблица : Теоретические частоты попадания случайной величины в интервалы\n\n")
+        f.write(f"{'Границы интервалов':<20} {'Теоретические вероятности':<25}\n")
+        f.write("-" * 45 + "\n")
+        
+        for i, (left, right) in enumerate(intervals):
+            prob = probabilities[i]
+            interval_str = f"{left:.4f} – {right:.4f}"
+            print(f"{interval_str:<20} {prob:<25.6f}")
+            f.write(f"{interval_str:<20} {prob:<25.6f}\n")
+
+    print(f"\nРезультаты сохранены в файл: {filename}")
+
+def plot_normal_curve_with_intervals(data, intervals, probabilities):
+    """Строит график нормального распределения с выделенными интервалами."""
+    mean = np.mean(data)
+    std = np.std(data, ddof=1)
+    x = np.linspace(mean - 4*std, mean + 4*std, 1000)
+    y = stats.norm.pdf(x, mean, std)
+
+    plt.figure(figsize=(12, 6))
+    plt.plot(x, y, 'k-', linewidth=2, label='Нормальное распределение')
+    
+    # Выделяем интервалы
+    colors = ['red', 'green', 'blue', 'orange', 'purple', 'brown', 'pink', 'gray', 'olive', 'cyan']
+    for i, (left, right) in enumerate(intervals):
+        if i < len(colors):
+            color = colors[i % len(colors)]
+        else:
+            color = 'black'
+        mask = (x >= left) & (x <= right)
+        plt.fill_between(x[mask], y[mask], color=color, alpha=0.3, label=f'Интервал {i+1}')
+
+    plt.title("Нормальное распределение с выделенными интервалами")
+    plt.xlabel("Значения")
+    plt.ylabel("Плотность")
+    plt.legend()
+    plt.grid()
+    plt.show()
+
+def main():
+    print("Вычисление теоретических вероятностей попадания в интервалы")
+    data = load_data()
+    if data is None:
+        return
+
+    if len(data) < 3:
+        print("Недостаточно данных для анализа.")
+        return
+
+    # Получаем интервалы
+    intervals = get_intervals(data, num_bins=10)  
+    print(f"Количество интервалов: {len(intervals)}")
+
+    # Вычисляем теоретические вероятности
+    probabilities = compute_theoretical_probabilities(data, intervals)
+
+    # Сохраняем в таблицу
+    save_to_table(intervals, probabilities)
+
+    # Строим график
+    plot_normal_curve_with_intervals(data, intervals, probabilities)
+
+if __name__ == "__main__":
+    main()
