@@ -1,0 +1,79 @@
+import numpy as np
+from scipy import stats
+import matplotlib.pyplot as plt
+
+def load_data(filename="data.txt"):
+    try:
+        with open(filename, 'r') as f:
+            data = [float(x) for x in f.read().split()]
+        return data
+    except FileNotFoundError:
+        print(f"Файл {filename} не найден.")
+        return None
+
+def compute_skewness_kurtosis(data):
+    """Вычисляет асимметрию и эксцесс."""
+    data = np.array(data)
+    skewness = stats.skew(data)
+    kurtosis = stats.kurtosis(data, fisher=True)  # эксцесс относительно нормального (Fisher)
+    return skewness, kurtosis
+
+def test_normality(skewness, kurtosis):
+    """Проверяет, соответствует ли распределение нормальному по асимметрии и эксцессу."""
+    print(f"Коэффициент асимметрии: {skewness:.6f}")
+    print(f"Коэффициент эксцесса: {kurtosis:.6f}")
+    
+    print("\nПроверка соответствия нормальному распределению:")
+    
+    # Нормальное распределение: асимметрия ≈ 0, эксцесс ≈ 0
+    skew_ok = abs(skewness) < 0.5  # эмпирический порог
+    kurt_ok = abs(kurtosis) < 0.5  # эмпирический порог
+    
+    if skew_ok and kurt_ok:
+        print("Распределение может соответствовать нормальному (асимметрия и эксцесс близки к 0).")
+    else:
+        print("Распределение НЕ соответствует нормальному (асимметрия или эксцесс отличаются от 0).")
+        
+    if not skew_ok:
+        print(f"   - Асимметрия |{skewness:.6f}| >= 0.5")
+    if not kurt_ok:
+        print(f"   - Эксцесс |{kurtosis:.6f}| >= 0.5")
+
+def plot_histogram_with_normal(data):
+    """Строит гистограмму и накладывает график нормального распределения."""
+    data = np.array(data)
+    mean = np.mean(data)
+    std = np.std(data, ddof=1)
+
+    plt.figure(figsize=(10, 6))
+    plt.hist(data, bins='auto', density=True, alpha=0.6, color='skyblue', label='Гистограмма')
+
+    # Плотность нормального распределения
+    xmin, xmax = plt.xlim()
+    x = np.linspace(xmin, xmax, 1000)
+    p = stats.norm.pdf(x, mean, std)
+    plt.plot(x, p, 'k', linewidth=2, label='Нормальное распределение')
+
+    plt.title("Гистограмма и плотность нормального распределения")
+    plt.xlabel("Значения")
+    plt.ylabel("Плотность")
+    plt.legend()
+    plt.grid()
+    plt.show()
+
+def main():
+    print("Проверка гипотезы о нормальности")
+    data = load_data()
+    if data is None:
+        return
+
+    if len(data) < 3:
+        print("Недостаточно данных для анализа.")
+        return
+
+    skewness, kurtosis = compute_skewness_kurtosis(data)
+    test_normality(skewness, kurtosis)
+    plot_histogram_with_normal(data)
+
+if __name__ == "__main__":
+    main()
