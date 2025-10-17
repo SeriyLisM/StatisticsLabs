@@ -1,0 +1,74 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import pandas as pd
+
+def input_data_interactively():
+    print("Введите значения случайной величины (через пробел или по одному):")
+    data_input = input(">>> ")
+    try:
+        data = list(map(float, data_input.split()))
+    except ValueError:
+        print("Ошибка: введите числа через пробел.")
+        return input_data_interactively()
+    return data
+
+def save_data_to_file(data, filename="data.txt"):
+    np.savetxt(filename, data, fmt='%.6f')
+    print(f"Данные сохранены в файл: {filename}")
+
+def compute_statistics(data):
+    sample_mean = np.mean(data)
+    sample_variance = np.var(data, ddof=1)  # исправленная (несмещённая) оценка дисперсии
+    return sample_mean, sample_variance
+
+def plot_histogram(data):
+    plt.figure(figsize=(10, 6))
+    plt.hist(data, bins='auto', density=True, alpha=0.7, color='skyblue', edgecolor='black')
+    plt.title("Гистограмма распределения")
+    plt.xlabel("Значения")
+    plt.ylabel("Плотность вероятности")
+    plt.grid()
+    plt.show()
+
+def plot_empirical_cdf(data):
+    sorted_data = np.sort(data)
+    n = len(data)
+    cdf = np.arange(1, n + 1) / n
+
+    plt.figure(figsize=(10, 6))
+    plt.step(sorted_data, cdf, where='post')
+    plt.title("Эмпирическая функция распределения")
+    plt.xlabel("Значения")
+    plt.ylabel("F(x)")
+    plt.grid()
+    plt.show()
+
+def main():
+    print("Лабораторная работа: Статистический анализ случайной величины")
+    data = input_data_interactively()
+
+    if not data:
+        print("Нет данных для анализа.")
+        return
+
+    # Сохранение данных в файл
+    save_data_to_file(data)
+
+    # Вычисление статистик
+    mean, var = compute_statistics(data)
+    print(f"\nВыборочная средняя: {mean:.6f}")
+    print(f"Оценка дисперсии: {var:.6f}")
+
+    # Построение графиков
+    plot_histogram(data)
+    plot_empirical_cdf(data)
+
+    # Эмпирический закон (таблица частот)
+    unique_vals, counts = np.unique(data, return_counts=True)
+    freqs = counts / len(data)
+    df = pd.DataFrame({'Значение': unique_vals, 'Частота': freqs})
+    print("\nЭмпирический закон распределения:")
+    print(df)
+
+if __name__ == "__main__":
+    main()
