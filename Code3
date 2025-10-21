@@ -2,7 +2,6 @@ import math
 from scipy.stats import norm # Для функции Лапласа
 
 def load_data_from_file(filename):
-    """Загружает данные из файла."""
     data = []
     try:
         with open(filename, 'r') as f:
