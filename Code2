@@ -1,79 +1,62 @@
-import numpy as np
-from scipy import stats
-import matplotlib.pyplot as plt
+import math
 
-def load_data(filename="data.txt"):
+def load_data_from_file(filename):
+    """Загружает данные из файла."""
+    data = []
     try:
         with open(filename, 'r') as f:
-            data = [float(x) for x in f.read().split()]
+            for line in f:
+                line = line.strip()
+                if line:  
+                    data.append(float(line))
+        if len(data) == 0:
+            print("Файл пуст.")
+            return None
         return data
     except FileNotFoundError:
         print(f"Файл {filename} не найден.")
         return None
+    except ValueError:
+        print("Ошибка при чтении данных из файла. Убедитесь, что файл содержит только числа.")
+        return None
 
-def compute_skewness_kurtosis(data):
-    """Вычисляет асимметрию и эксцесс."""
-    data = np.array(data)
-    skewness = stats.skew(data)
-    kurtosis = stats.kurtosis(data, fisher=True)  # эксцесс относительно нормального (Fisher)
-    return skewness, kurtosis
+filename = input("Введите имя файла с данными (например, data.txt): ")
+data = load_data_from_file(filename)
 
-def test_normality(skewness, kurtosis):
-    """Проверяет, соответствует ли распределение нормальному по асимметрии и эксцессу."""
-    print(f"Коэффициент асимметрии: {skewness:.6f}")
-    print(f"Коэффициент эксцесса: {kurtosis:.6f}")
-    
-    print("\nПроверка соответствия нормальному распределению:")
-    
-    # Нормальное распределение: асимметрия ≈ 0, эксцесс ≈ 0
-    skew_ok = abs(skewness) < 0.5  # эмпирический порог
-    kurt_ok = abs(kurtosis) < 0.5  # эмпирический порог
-    
-    if skew_ok and kurt_ok:
-        print("Распределение может соответствовать нормальному (асимметрия и эксцесс близки к 0).")
-    else:
-        print("Распределение НЕ соответствует нормальному (асимметрия или эксцесс отличаются от 0).")
-        
-    if not skew_ok:
-        print(f"   - Асимметрия |{skewness:.6f}| >= 0.5")
-    if not kurt_ok:
-        print(f"   - Эксцесс |{kurtosis:.6f}| >= 0.5")
+if data is None:
+    exit()
 
-def plot_histogram_with_normal(data):
-    """Строит гистограмму и накладывает график нормального распределения."""
-    data = np.array(data)
-    mean = np.mean(data)
-    std = np.std(data, ddof=1)
+n = len(data)
+print(f"Загружено {n} значений.")
 
-    plt.figure(figsize=(10, 6))
-    plt.hist(data, bins='auto', density=True, alpha=0.6, color='skyblue', label='Гистограмма')
+x_mean = sum(data) / n
+s_squared = sum((x - x_mean)**2 for x in data) / (n - 1)
+s = math.sqrt(s_squared) # Выборочное стандартное отклонение
 
-    # Плотность нормального распределения
-    xmin, xmax = plt.xlim()
-    x = np.linspace(xmin, xmax, 1000)
-    p = stats.norm.pdf(x, mean, std)
-    plt.plot(x, p, 'k', linewidth=2, label='Нормальное распределение')
+print(f"\nВыборочная средняя (x̄): {x_mean:.6f}")
+print(f"Выборочная дисперсия (s²): {s_squared:.6f}")
+print(f"Выборочное стандартное отклонение (s): {s:.6f}")
 
-    plt.title("Гистограмма и плотность нормального распределения")
-    plt.xlabel("Значения")
-    plt.ylabel("Плотность")
-    plt.legend()
-    plt.grid()
-    plt.show()
+sum_cubed_deviations = sum((x - x_mean)**3 for x in data)
+A = sum_cubed_deviations / ((n - 1) * s**3)
 
-def main():
-    print("Проверка гипотезы о нормальности")
-    data = load_data()
-    if data is None:
-        return
+sum_fourth_deviations = sum((x - x_mean)**4 for x in data)
+E = sum_fourth_deviations / ((n - 1) * s**4) - 3
 
-    if len(data) < 3:
-        print("Недостаточно данных для анализа.")
-        return
+print(f"\nКоэффициент асимметрии (A): {A:.6f}")
+print(f"Коэффициент эксцесса (E): {E:.6f}")
 
-    skewness, kurtosis = compute_skewness_kurtosis(data)
-    test_normality(skewness, kurtosis)
-    plot_histogram_with_normal(data)
+print("\n" + "="*60)
+print("ПРОВЕРКА ГИПОТЕЗЫ О НОРМАЛЬНОМ РАСПРЕДЕЛЕНИИ")
+print("="*60)
 
-if __name__ == "__main__":
-    main()
+if abs(A) < 0.5 and abs(E) < 0.5:
+    print("Вывод: Эмпирическое распределение близко к нормальному.")
+elif abs(A) >= 0.5 and abs(E) < 0.5:
+    print("Вывод: Распределение имеет заметную асимметрию, но кривизна близка к нормальной.")
+elif abs(A) < 0.5 and abs(E) >= 0.5:
+    print("Вывод: Распределение симметрично, но имеет иную кривизну (острее или плосче) по сравнению с нормальным.")
+else:
+    print("Вывод: Распределение отличается от нормального как по асимметрии, так и по кривизне.")
+
+print("\nТеоретические значения для нормального распределения: A=0, E=0.")
