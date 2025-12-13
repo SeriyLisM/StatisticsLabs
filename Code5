@@ -1,0 +1,131 @@
+import math
+from scipy.stats import f 
+
+def load_data_from_file(filename):
+    data = []
+    try:
+        with open(filename, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    try:
+                        data.append(float(line))
+                    except ValueError:
+                        print(f"Предупреждение: строка '{line}' не является числом и будет проигнорирована.")
+        if len(data) == 0:
+            print(f"Файл {filename} пуст или не содержит чисел.")
+            return None
+        return data
+    except FileNotFoundError:
+        print(f"Файл {filename} не найден.")
+        return None
+
+def calculate_sample_variance(data):
+    n = len(data)
+    mean = sum(data) / n
+    variance = sum((x - mean)**2 for x in data) / (n - 1)
+    return variance
+
+def main():
+    print("--- Критерий Фишера-Снедекора ---")
+    print("Проверка гипотезы о равенстве дисперсий двух нормальных генеральных совокупностей.")
+
+    data_x = load_data_from_file('data_x.txt')
+    data_y = load_data_from_file('data_y.txt')
+
+    if data_x is not None and data_y is not None:
+        print("Данные успешно загружены из файлов data_x.txt и data_y.txt.")
+        print(f"Выборка X: {len(data_x)} значений.")
+        print(f"Выборка Y: {len(data_y)} значений.")
+    else:
+        print("Файлы data_x.txt и/или data_y.txt не найдены. Введите данные вручную.")
+
+        while True:
+            try:
+                n_x = int(input("Введите количество экспериментов для выборки X (n1): "))
+                if n_x <= 0:
+                    print("Количество экспериментов должно быть положительным.")
+                    continue
+                break
+            except ValueError:
+                print("Пожалуйста, введите целое число.")
+
+        data_x = []
+        for i in range(n_x):
+            while True:
+                try:
+                    value = float(input(f"Введите значение x{i+1} для выборки X: "))
+                    data_x.append(value)
+                    break
+                except ValueError:
+                    print("Пожалуйста, введите числовое значение.")
+
+        while True:
+            try:
+                n_y = int(input("Введите количество экспериментов для выборки Y (n2): "))
+                if n_y <= 0:
+                    print("Количество экспериментов должно быть положительным.")
+                    continue
+                break
+            except ValueError:
+                print("Пожалуйста, введите целое число.")
+
+        data_y = []
+        for i in range(n_y):
+            while True:
+                try:
+                    value = float(input(f"Введите значение y{i+1} для выборки Y: "))
+                    data_y.append(value)
+                    break
+                except ValueError:
+                    print("Пожалуйста, введите числовое значение.")
+
+        with open("data_x.txt", "w") as f:
+            for value in data_x:
+                f.write(f"{value}\n")
+        print("Данные выборки X сохранены в файл data_x.txt")
+
+        with open("data_y.txt", "w") as f:
+            for value in data_y:
+                f.write(f"{value}\n")
+        print("Данные выборки Y сохранены в файл data_y.txt")
+
+    s_x_squared = calculate_sample_variance(data_x)
+    s_y_squared = calculate_sample_variance(data_y)
+
+    print(f"\nВыборочная дисперсия для X (s_x²): {s_x_squared:.6f}")
+    print(f"Выборочная дисперсия для Y (s_y²): {s_y_squared:.6f}")
+
+    if s_x_squared >= s_y_squared:
+        F = s_x_squared / s_y_squared
+        df1 = len(data_x) - 1  # Степени свободы для числителя (n1 - 1)
+        df2 = len(data_y) - 1  # Степени свободы для знаменателя (n2 - 1)
+        print(f"\nF = s_x² / s_y² = {F:.4f}")
+    else:
+        F = s_y_squared / s_x_squared
+        df1 = len(data_y) - 1  # Степени свободы для числителя (n2 - 1)
+        df2 = len(data_x) - 1  # Степени свободы для знаменателя (n1 - 1)
+        print(f"\nF = s_y² / s_x² = {F:.4f}")
+
+    alpha = 0.05 # Можно изменить
+    print(f"Уровень значимости (α): {alpha}")
+
+    critical_value = f.ppf(1 - alpha, df1, df2)
+    print(f"Критическое значение F (α={alpha}, k1={df1}, k2={df2}): {critical_value:.4f}")
+
+    print("\n--- Результат проверки гипотезы ---")
+    print(f"H₀: Дисперсии генеральных совокупностей равны (σ_x² = σ_y²).")
+    print(f"H₁: Дисперсии генеральных совокупностей не равны (σ_x² ≠ σ_y²).")
+    print(f"Расчетное значение F = {F:.4f}")
+    print(f"Критическое значение F = {critical_value:.4f}")
+
+    if F > critical_value:
+        print("Вывод: F > F_критич. Гипотеза H₀ отвергается.")
+        print("Дисперсии не равны.")
+    else:
+        print("Вывод: F <= F_критич. Гипотеза H₀ принимается.")
+        print("Дисперсии равны.")
+
+
+if __name__ == "__main__":
+    main()
