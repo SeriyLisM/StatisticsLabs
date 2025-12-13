@@ -1,0 +1,164 @@
+import math
+import pandas as pd
+import numpy as np
+from scipy.stats import chi2 
+
+def load_data_from_file(filename):
+    data = []
+    try:
+        with open(filename, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    try:
+                        data.append(float(line))
+                    except ValueError:
+                        print(f"Предупреждение: строка '{line}' не является числом и будет проигнорирована.")
+        if len(data) == 0:
+            print(f"Файл {filename} пуст или не содержит чисел.")
+            return None
+        return data
+    except FileNotFoundError:
+        print(f"Файл {filename} не найден.")
+        return None
+
+def load_theoretical_probabilities(filename):
+
+    intervals = []
+    probabilities = []
+    try:
+        with open(filename, 'r') as f:
+            lines = f.readlines()
+            for line in lines[1:]:
+                parts = line.strip().split('\t')
+                if len(parts) < 2:
+                    continue 
+                interval_str = parts[0]
+                try:
+                    prob = float(parts[1])
+                    # Парсим строку интервала "[a; b)" или "[a; b]"
+                    interval_str = interval_str.replace('[', '').replace(']', '').replace(')', '')
+                    bounds = interval_str.split('; ')
+                    left_bound = float(bounds[0])
+                    right_bound = float(bounds[1])
+                    intervals.append((left_bound, right_bound))
+                    probabilities.append(prob)
+                except (ValueError, IndexError):
+                    print(f"Предупреждение: не удалось распознать строку в файле {filename}: {line.strip()}")
+                    continue
+        if len(probabilities) == 0:
+            print(f"Файл {filename} не содержит корректных данных.")
+            return None, None
+        return intervals, probabilities
+    except FileNotFoundError:
+        print(f"Файл {filename} с теоретическими вероятностями не найден.")
+        return None, None
+
+def calculate_chi_squared(observed_freq, expected_freq):
+    if len(observed_freq) != len(expected_freq):
+        raise ValueError("Длины массивов частот должны совпадать.")
+
+    chi_squared = 0.0
+    contributions = [] # Для отладки и вывода в таблицу
+    for o, e in zip(observed_freq, expected_freq):
+        if e <= 0:
+            print(f"Предупреждение: теоретическая частота {e} <= 0. Критерий может быть неприменим.")
+        contribution = ((o - e) ** 2) / e
+        chi_squared += contribution
+        contributions.append(contribution)
+    return chi_squared, contributions
+
+def find_critical_value_from_table(df, alpha, critical_values_df):
+    df_rounded = round(df)
+    alpha_str = f"{alpha:.3f}"
+    try:
+        critical_val = critical_values_df.loc[critical_values_df['k'] == df_rounded, alpha_str].values[0]
+        return critical_val
+    except IndexError:
+        print(f"Не удалось найти критическое значение для k={df_rounded}, alpha={alpha} в таблице.")
+        return None
+
+def main():
+    print("--- Лабораторная работа №4: Критерий Пирсона (χ²) ---")
+    print("Проверка гипотезы о нормальном распределении.")
+
+    data_filename = 'data.txt'
+    data = load_data_from_file(data_filename)
+    if data is None:
+        print("Не удалось загрузить данные. Выполнение остановлено.")
+        return
+    n = len(data)
+    print(f"Загружено {n} значений из {data_filename}.")
+
+    prob_filename = 'theor_probab.txt'
+    intervals, p_theor = load_theoretical_probabilities(prob_filename)
+    if intervals is None or p_theor is None:
+        print("Не удалось загрузить теоретические вероятности. Выполнение остановлено.")
+        return
+    k = len(p_theor) 
+    print(f"Загружено {k} интервалов и вероятностей из {prob_filename}.")
+
+    freq_empir = []
+    for i, (left_bound, right_bound) in enumerate(intervals):
+        if i < k - 1: 
+            count = sum(1 for x in data if left_bound <= x < right_bound)
+        else: 
+            count = sum(1 for x in data if left_bound <= x <= right_bound)
+        freq_empir.append(count)
+
+    freq_theor = [n * p for p in p_theor]
+
+    try:
+        chi_squared_stat, contrib_to_chi_sq = calculate_chi_squared(freq_empir, freq_theor)
+        print(f"\nВычисленное значение χ²: {chi_squared_stat:.4f}")
+    except ValueError as e:
+        print(f"Ошибка при вычислении χ²: {e}")
+        return
+
+    degrees_of_freedom = k - 3
+    if degrees_of_freedom <= 0:
+        print(f"Число степеней свободы ({degrees_of_freedom}) <= 0. Критерий неприменим.")
+        print("Возможно, слишком мало интервалов или они не удовлетворяют условиям применимости критерия.")
+        return
+    print(f"Число степеней свободы (k = n_intervals - 1 - 2): {degrees_of_freedom}")
+
+    alpha = 0.05 # Можно изменить
+    print(f"Уровень значимости (α): {alpha}")
+
+    critical_value_scipy = chi2.ppf(1 - alpha, degrees_of_freedom)
+    print(f"Критическое значение χ² (scipy) для k={degrees_of_freedom}, α={alpha}: {critical_value_scipy:.4f}")
+
+    critical_value = critical_value_scipy 
+
+    print("\n--- Результат проверки гипотезы ---")
+    print(f"H₀: Случайная величина распределена по нормальному закону (μ̂={sum(data)/n:.6f}, σ̂²={sum((x - sum(data)/n)**2 for x in data) / (n - 1):.6f}).")
+    print(f"H₁: Случайная величина НЕ распределена по нормальному закону.")
+    print(f"Вычисленное χ² = {chi_squared_stat:.4f}")
+    print(f"Критическое χ² = {critical_value:.4f}")
+    if chi_squared_stat > critical_value:
+        print("Вывод: χ²_набл > χ²_критич. Гипотеза H₀ отвергается.")
+        print("Существенное различие между эмпирическим и теоретическим (нормальным) распределениями.")
+    else:
+        print("Вывод: χ²_набл <= χ²_критич. Гипотеза H₀ принимается.")
+        print("Нет оснований отвергать гипотезу о нормальности распределения.")
+
+    print("\n--- Теоретические и эмпирические частоты ---")
+    empirical_rel_freq = [n_i / n for n_i in freq_empir]
+
+    interval_labels = [f"[{l:.2f}; {u:.2f})" for l, u in intervals[:-1]]
+    interval_labels.append(f"[{intervals[-1][0]:.2f}; {intervals[-1][1]:.2f}]")
+
+    table_data = {
+        'Границы интервалов': interval_labels,
+        'Теоретические частоты (np_i)': freq_theor, 
+        'Эмпирические частоты (n_i/n)': empirical_rel_freq,
+        '(n_i - np_i)^2 / np_i': contrib_to_chi_sq
+    }
+    df_table = pd.DataFrame(table_data)
+
+    print(df_table.to_string(index=False))
+    print(f"\nСумма (n_i - np_i)^2 / np_i (χ²): {df_table['(n_i - np_i)^2 / np_i'].sum():.4f}")
+
+
+if __name__ == "__main__":
+    main()
