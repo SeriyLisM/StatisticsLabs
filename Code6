@@ -1,0 +1,180 @@
+import math
+
+def load_data_from_file(filename):
+    data = []
+    try:
+        with open(filename, 'r') as f:
+            lines = f.readlines()
+            for line in lines[1:]:
+                parts = line.strip().split(',')
+                if len(parts) < 2:
+                    continue 
+                row = []
+                for part in parts:
+                    try:
+                        row.append(float(part))
+                    except ValueError:
+                        print(f"Предупреждение: строка '{line.strip()}' содержит некорректные данные и будет проигнорирована.")
+                        row = None
+                        break
+                if row is not None:
+                    data.append(row)
+        if len(data) == 0:
+            print(f"Файл {filename} пуст или не содержит корректных данных.")
+            return None
+        return data
+    except FileNotFoundError:
+        print(f"Файл {filename} не найден.")
+        return None
+
+def calculate_mean(data_list):
+    return sum(data_list) / len(data_list)
+
+def calculate_variance(data_list):
+    n = len(data_list)
+    mean = calculate_mean(data_list)
+    variance = sum((x - mean)**2 for x in data_list) / (n - 1)
+    return variance
+
+def calculate_correlation_coefficient(x_list, y_list):
+    n = len(x_list)
+    if n != len(y_list):
+        raise ValueError("Длины списков должны совпадать.")
+
+    mean_x = calculate_mean(x_list)
+    mean_y = calculate_mean(y_list)
+    var_x = calculate_variance(x_list)
+    var_y = calculate_variance(y_list)
+
+    # Стандартное отклонение
+    std_x = math.sqrt(var_x)
+    std_y = math.sqrt(var_y)
+
+    covariance = sum((x - mean_x) * (y - mean_y) for x, y in zip(x_list, y_list)) / (n - 1)
+
+    if std_x == 0 or std_y == 0:
+        return 0.0 
+    correlation = covariance / (std_x * std_y)
+    return correlation
+
+def main():
+    print("--- Лабораторная работа №6: Корреляционный анализ ---")
+    print("Исследование степени статистической связи между случайными величинами.")
+
+    data = load_data_from_file('correlation_data.txt')
+
+    if data is not None:
+        print("Данные успешно загружены из файла correlation_data.txt.")
+        n = len(data)
+        num_vars = len(data[0])
+        print(f"Загружено {n} наблюдений для {num_vars} случайных величин.")
+    else:
+        print("Файл correlation_data.txt не найден. Введите данные вручную.")
+
+        while True:
+            try:
+                num_vars = int(input("Введите количество случайных величин (не менее 2): "))
+                if num_vars < 2:
+                    print("Количество случайных величин должно быть не менее 2.")
+                    continue
+                break
+            except ValueError:
+                print("Пожалуйста, введите целое число.")
+
+        while True:
+            try:
+                n = int(input("Введите количество наблюдений (n): "))
+                if n <= 0:
+                    print("Количество наблюдений должно быть положительным.")
+                    continue
+                break
+            except ValueError:
+                print("Пожалуйста, введите целое число.")
+
+        data = []
+        for i in range(n):
+            row = []
+            print(f"\nНаблюдение {i+1}:")
+            for j in range(num_vars):
+                while True:
+                    try:
+                        value = float(input(f"  Введите значение для переменной {chr(65+j)} (X{j+1}): "))
+                        row.append(value)
+                        break
+                    except ValueError:
+                        print("Пожалуйста, введите числовое значение.")
+            data.append(row)
+
+        with open("correlation_data.txt", "w") as f:
+            header = ",".join([f"X{i+1}" for i in range(num_vars)])
+            f.write(header + "\n")
+            for row in data:
+                line = ",".join(map(str, row))
+                f.write(line + "\n")
+        print("Данные сохранены в файл correlation_data.txt")
+
+    variables = []
+    for j in range(len(data[0])):
+        var_data = [row[j] for row in data]
+        variables.append(var_data)
+
+    num_vars = len(variables)
+    n = len(data)
+
+    print(f"\nВсего {n} наблюдений для {num_vars} случайных величин.")
+
+    correlation_matrix = [[0.0 for _ in range(num_vars)] for _ in range(num_vars)]
+
+    for i in range(num_vars):
+        for j in range(num_vars):
+            if i == j:
+                correlation_matrix[i][j] = 1.0 # Диагональ всегда равна 1
+            elif i < j: # Чтобы не вычислять дважды
+                corr = calculate_correlation_coefficient(variables[i], variables[j])
+                correlation_matrix[i][j] = corr
+                correlation_matrix[j][i] = corr # Симметричность
+
+    print("\n--- Матрица коэффициентов парной корреляции ---")
+    # Выводим заголовки столбцов
+    header_row = "   "
+    for j in range(num_vars):
+        header_row += f"X{j+1:>8}"
+    print(header_row)
+    print("-" * (4 + 8 * num_vars))
+
+    for i in range(num_vars):
+        row_str = f"X{i+1} "
+        for j in range(num_vars):
+            row_str += f"{correlation_matrix[i][j]:>8.4f}"
+        print(row_str)
+
+    print("\n--- Вывод о статистической зависимости случайных величин ---")
+    for i in range(num_vars):
+        for j in range(i + 1, num_vars): # Только верхний треугольник, чтобы не повторять
+            corr = correlation_matrix[i][j]
+            var_i = chr(65 + i) # X1 -> A, X2 -> B, ...
+            var_j = chr(65 + j)
+            abs_corr = abs(corr)
+            print(f"Коэффициент корреляции между X{i+1} и X{j+1} (r_{var_i}{var_j}): {corr:.4f}")
+
+            if abs_corr < 0.3:
+                print(f"  Слабая связь.")
+            elif 0.3 <= abs_corr < 0.7:
+                print(f"  Умеренная связь.")
+            elif 0.7 <= abs_corr < 0.9:
+                print(f"  Сильная связь.")
+            else:
+                print(f"  Очень сильная связь.")
+
+            if abs_corr > 0.9:
+                print(f"  Существует очень сильная статистическая зависимость между X{i+1} и X{j+1}.")
+            elif abs_corr > 0.7:
+                print(f"  Существует сильная статистическая зависимость между X{i+1} и X{j+1}.")
+            elif abs_corr > 0.5:
+                print(f"  Существует умеренная статистическая зависимость между X{i+1} и X{j+1}.")
+            else:
+                print(f"  Связь между X{i+1} и X{j+1} слабая или отсутствует.")
+
+
+if __name__ == "__main__":
+    main()
